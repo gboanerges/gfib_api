@@ -6,13 +6,18 @@ exports.up = function(knex) {
 
     table.string('products').notNullable();
 
-    table.decimal('value').notNullable();
-    table.decimal('receivedValue').notNullable();
+    table.decimal('totalValue').notNullable();
+    table.decimal('cashValue').notNullable();
+    table.decimal('cardValue').notNullable();
 
     table.string('paymentType').notNullable();
-    table.string('client').notNullable();
+    table.string('paymentMode').notNullable();
+    table.integer('client')
+      .notNullable()
+      .references('id')
+      .inTable('clients');
     
-    table.timestamp('created_at').defaultTo(knex.fn.now());
+    table.timestamp('created_at').notNullable();
 
   });
 };
