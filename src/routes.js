@@ -15,10 +15,10 @@ routes.delete('/orders/:id', OrderController.delete);
 routes.put('/orders/:id', OrderController.update);
 
 routes.get('/clients', ClientController.index);
+routes.get('/clients/:id', ClientController.show);
 routes.post('/clients', ClientController.create);
 routes.delete('/clients/:id', ClientController.delete);
 routes.put('/clients/:id', ClientController.update);
-routes.post('/clients/:name', ClientController.debt);
 
 routes.get('/products', ProductController.index);
 routes.post('/products', ProductController.create);

@@ -9,11 +9,31 @@ module.exports = {
     
     return response.json(clients);
   },
-  
+
+  // List specific client by id
+  async show(request, response) {
+    
+    const { id } = request.params;
+
+    const client = await connection('clients').where('id', id).select('*');
+    
+    if(client.length > 0) {
+
+      return response.json(client);
+    }
+    
+    else {
+
+      return response.json({
+        error: 'Id inválido',
+        msg: 'Cliente não cadastrado',
+      });
+    }
+  },
+
   async create(request, response) {
 
     const { clientName } = request.body;
-
     const name = clientName.toUpperCase();
 
     const debt = 0;
@@ -24,21 +44,50 @@ module.exports = {
       debt
     });
 
-    return response.status(204).send();
+    return response.status(201).send();
   },
   
   // Updates only name of a client
   async update(request, response) {
 
     const { id } = request.params;
-    const { name } = request.body;
+    const { name, debt } = request.body;
 
-    await connection('clients').where('id', id).update({
+    if (name != '' && debt == '') {
 
-      name,
-    });
+      await connection('clients').where('id', id).update({
 
-    return response.status(204).send();
+        name,
+      });
+      
+      return response.status(201).send({
+
+        msg: 'Client name updated.'
+      });
+
+    } else if (name == '' && debt != '') {
+
+      
+      const checkClient = await connection('clients').where('id', id).select('*');
+
+      const newDebt = checkClient[0]['debt'] + debt;
+
+      // await connection('clients').where('id', id).update({
+
+      //   debt: newDebt,
+      // });
+      
+      return response.status(201).send({
+
+        msg: 'Debt updated.'
+      });
+
+    } else {
+
+      return response.status(400).send();
+    }
+   
+
   },
   
   // Delete a client without debt
@@ -52,8 +101,6 @@ module.exports = {
     const client = data[0]['name'];
     const debt = data[0]['debt'];
 
-    console.log(client, debt);
-    
     if (debt !== 0) {
 
       return response.json({
@@ -66,17 +113,5 @@ module.exports = {
     await connection('clients').where('id', id).delete();
 
     return response.status(204).send();
-  },
-
-  // List all unpaid purchases of a single client
-  async debt(request, response) {
-
-    // Name of client
-    const { name } = request.params;
-
-    // Search all purchases made by the given client
-    const clientPurchases = await connection('orders').where('client', name).select('*');
-    
-    return response.json(clientPurchases);
   },
 }
