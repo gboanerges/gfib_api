@@ -1,11 +1,11 @@
-const connection = require('../database/connection');
+const knex = require('../database/connection');
 
 module.exports = {
 
   // Return all orders or specific client orders
   async index(request, response) {
       
-    const orders = await connection('orders').select('*');
+    const orders = await knex('orders').select('*');
     return response.json(orders);
   },
 
@@ -14,14 +14,15 @@ module.exports = {
 
     const { id } = request.params;
     
-    const clientName = await connection('clients').where('id', id).select('name');
+    const clientOrders = await knex('orders').select('*').where('client', id);
     
-    if (clientName.length != 0){
+    if(clientOrders.length > 0) {
 
-      const clientOrders = await connection('orders').select('*').where('client', clientName[0].name);
       return response.json(clientOrders);
+    }
+    
+    else {
 
-    }else {
       return response.json({
         error: 'Id inválido',
         msg: 'Cliente não cadastrado',
@@ -32,46 +33,90 @@ module.exports = {
   // Create a new order, checking the given client
   async create(request, response) {
 
-    const { products, value, receivedValue, client, paymentType } = request.body;
+    const { 
+      products,
+      totalValue,
+      cashValue,
+      cardValue,
+      client, // Client ID
+      paymentMode,
+      paymentType,
+
+    } = request.body;
     
-    await connection('orders').insert({
+    const date = new Date().toLocaleDateString();
+
+    const trx = await knex.transaction();
+
+    await trx('orders').insert({
 
       products,
-      value,
-      receivedValue,
+      totalValue,
+      cashValue,
+      cardValue,
       client,
-      paymentType
+      paymentMode,
+      paymentType,
+      created_at: date
     });
     
-    const name = client.toUpperCase();
-    const result = (value - receivedValue);
+    // Id client > 0, might need update his debt
+    if(client != 0){
 
-    if( name !== 'CLIENTE' && paymentType === 'FIADO'){
-
-      // Check value of result, equals to 0 there is no need to be FIADO
-      if (result === 0) {
-
-        return response.json({
-          msg: 'Valor da compra recebido TOTALMENTE.',
-          error: 'Tipo de pagamento incompatível.'});
-      }
+      const checkClient = await trx('clients').where('id', client).select('*');
       
-      const checkClient = await connection('clients').where('name', name).select('*');
-      
+      // Check if the id is registered
       if (checkClient.length != 0){
-      
-        const debt = checkClient[0]['debt'] + result;
         
-        await connection('clients').where('name', name).update('debt', debt);
-        return response.status(204).send();
+        // Client paid the total value
+        if(paymentType === 'TOTAL') {
 
+          await trx.commit();
+          return response.status(204).json({
+            msg: "Compra cadastrada com sucesso!"
+          });
+        }
+        
+        else if(paymentType === 'DÍVIDA') {
+
+          const debt = checkClient[0].debt - totalValue;
+
+          await trx('clients').where('id', client).update('debt', debt);
+
+          await trx.commit();
+          return response.status(204).json({
+            msg: "Pagamento de dívida cadastrado com sucesso!"
+          });
+        }
+        /*
+          Client didnt pay or paid less/more than total
+          Need to alter his debt
+        */
+        else {
+          const receivedValue = totalValue - cashValue + cardValue;
+
+          const debt = checkClient[0]['debt'] + receivedValue;
+      
+          await trx('clients').where('id', client).update('debt', debt);
+          
+          await trx.commit();
+          return response.status(204).send();
+        }
+        
       }else {
 
         return response.json({
-          error: 'Nome inválido',
+          error: 'ID inválido',
           msg: 'Cliente não cadastrado',
         });
       }
+    }
+    else {
+
+      await trx.commit();
+      return response.status(204).json({
+        msg: "Compra cadastrada com sucesso!"
+      });
     }
   },
   
@@ -84,13 +129,13 @@ module.exports = {
     const { idClient } = request.body;
     const { value } = request.body;
 
-    const checkClient = await connection('clients').where('id', idClient).select('*');
+    const checkClient = await knex('clients').where('id', idClient).select('*');
       
     const debt = checkClient[0]['debt'] - value;
     
-    await connection('clients').where('id', idClient).update('debt', debt);
+    await knex('clients').where('id', idClient).update('debt', debt);
 
-    await connection('orders').where('id', id).update({
+    await knex('orders').where('id', id).update({
 
       receivedValue: value
     });
@@ -103,7 +148,7 @@ module.exports = {
     // Receive id from request 
     const { id } = request.params;
     // Search for the given order
-    const data = await connection('orders').where('id', id).select('*');
+    const data = await knex('orders').where('id', id).select('*');
 
     const client = data[0]['client'];
     const debt = (data[0]['value'] - data[0]['receivedValue']);
@@ -111,8 +156,6 @@ module.exports = {
     // Check if isnt a normal client 
     if (client !== "CLIENTE" && debt !== 0) {
       
-      console.log(client);
-
       return response.json({
         msg: "Não é possivel deletar compra",
         error: "Compra não paga totalmente."
@@ -120,7 +163,7 @@ module.exports = {
     }
 
     // Delete order 
-    await connection('orders').where('id', id).delete();
+    await knex('orders').where('id', id).delete();
 
     return response.status(204).send();
   },
