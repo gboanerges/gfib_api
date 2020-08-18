@@ -2,15 +2,8 @@ const knex = require('../database/connection');
 
 module.exports = {
 
-  // Return all orders or specific client orders
-  async index(request, response) {
-      
-    const orders = await knex('orders').select('*');
-    return response.json(orders);
-  },
-
    // Return orders from specific client 
-   async show(request, response) {
+   async showClientOrders(request, response) {
 
     const { id } = request.params;
     
@@ -29,6 +22,71 @@ module.exports = {
       });
     }
   },
+
+  // Return orders from specific date or month, return dates with orders 
+   async showReportOrders(request, response) {
+
+    const { date } = request.query;
+    const { month } = request.query;
+    
+    if (date && month.length == 0 ) {
+
+        const dateOrders = await knex('orders')
+          .where('created_at', date)
+          .innerJoin('clients', 'orders.client', '=', 'clients.id')
+          .select('orders.products',
+          'orders.totalValue',
+          'orders.cashValue',
+          'orders.cardValue',
+          'orders.paymentType',
+          'orders.paymentMode', 
+          'orders.created_at', 
+          'clients.name');
+                                
+      if(dateOrders.length > 0) {
+
+        return response.json(dateOrders);
+      }
+      
+      else {
+
+        return response.json({
+          error: 'Data inválida',
+          msg: 'Não há compras neste dia.',
+        });
+      }
+    } else if (month && date.length == 0 ) {
+      
+      const monthOrders = await knex('orders')
+        .innerJoin('clients', 'orders.client', '=', 'clients.id')
+        .where('created_at', 'like', `%/${month}`)
+        .select('orders.products',
+        'orders.totalValue',
+        'orders.cashValue',
+        'orders.cardValue',
+        'orders.paymentType',
+        'orders.paymentMode', 
+        'orders.created_at', 
+        'clients.name');
+
+      if(monthOrders.length > 0) {
+
+        return response.json(monthOrders);
+      }
+      
+      else {
+
+        return response.json({
+          error: 'Mês sem compras',
+          msg: 'Não há compras neste mês.',
+        });
+      }
+    } else {
+
+      const dates = await knex('orders').select('created_at').distinct();
+      return response.json(dates);
+    }
+  },
   
   // Create a new order, checking the given client
   async create(request, response) {
@@ -44,7 +102,17 @@ module.exports = {
 
     } = request.body;
     
-    const date = new Date().toLocaleDateString();
+    const date = new Date();
+    const day = date.toLocaleDateString('pt',{
+      day: '2-digit'
+    });
+    const month = date.toLocaleDateString('pt',{
+      month: '2-digit'
+    });
+    const year = date.toLocaleDateString('pt',{
+      year: 'numeric'
+    });
+    const fullDate = day + '/' + month + '/' + year;
 
     const trx = await knex.transaction();
 
@@ -57,7 +125,7 @@ module.exports = {
       client,
       paymentMode,
       paymentType,
-      created_at: date
+      created_at: fullDate
     });
     
     // Id client > 0, might need update his debt
