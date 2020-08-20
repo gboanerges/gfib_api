@@ -28,8 +28,8 @@ module.exports = {
 
     const { date } = request.query;
     const { month } = request.query;
-    
-    if (date && month.length == 0 ) {
+
+    if (date.length > 0 && month.length == 0 ) {
 
         const dateOrders = await knex('orders')
           .where('created_at', date)
@@ -55,7 +55,7 @@ module.exports = {
           msg: 'Não há compras neste dia.',
         });
       }
-    } else if (month && date.length == 0 ) {
+    } else if (month.length > 0  && date.length == 0 ) {
       
       const monthOrders = await knex('orders')
         .innerJoin('clients', 'orders.client', '=', 'clients.id')
