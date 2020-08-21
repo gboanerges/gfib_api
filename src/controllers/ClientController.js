@@ -5,7 +5,7 @@ module.exports = {
   // List all clients
   async index(request, response) {
     
-    const clients = await connection('clients').select('*');
+    const clients = await connection('clients').select('*').where('id', '>', '1');
     
     return response.json(clients);
   },

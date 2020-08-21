@@ -129,7 +129,7 @@ module.exports = {
     });
     
     // Id client > 0, might need update his debt
-    if(client != 0){
+    if(client > 1){
 
       const checkClient = await trx('clients').where('id', client).select('*');
       
@@ -157,7 +157,7 @@ module.exports = {
           });
         }
         /*
-          Client didnt pay or paid less/more than total
+          Client didn't pay or paid less/more than total
           Need to alter his debt
         */
         else {
@@ -221,11 +221,11 @@ module.exports = {
     const client = data[0]['client'];
     const debt = (data[0]['value'] - data[0]['receivedValue']);
 
-    // Check if isnt a normal client 
+    // Check if isn't a normal client 
     if (client !== "CLIENTE" && debt !== 0) {
       
       return response.json({
-        msg: "Não é possivel deletar compra",
+        msg: "Não é possível deletar compra",
         error: "Compra não paga totalmente."
       });
     }
